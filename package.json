@@ -1,0 +1,12 @@
+{
+  "name": "workout-tracker",
+  "private": true,
+  "packageManager": "pnpm@10.27.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm --filter mcp-server dev",
+    "db:generate": "pnpm --filter @repo/db prisma generate",
+    "db:migrate": "pnpm --filter @repo/db prisma migrate dev",
+    "db:studio": "pnpm --filter @repo/db prisma studio"
+  }
+}
