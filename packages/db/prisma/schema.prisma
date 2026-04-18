@@ -8,13 +8,53 @@ datasource db {
 }
 
 model WorkoutEntry {
-  id        String   @id @default(cuid())
-  date      DateTime
-  exercise  String
-  setNumber Int
-  repsDone  Int?
-  weight    Float?
-  completed Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String         @id @default(cuid())
+  workoutSessionId String
+  exercise         String
+  date             DateTime
+  setNumber        Int
+  repsTarget       String?
+  repsDone         Int?
+  weightSuggestion Float?
+  weight       Float?
+  completed        Boolean        @default(false)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  workoutSession   WorkoutSession @relation(fields: [workoutSessionId], references: [id], onDelete: Cascade)
+
+  @@index([workoutSessionId, setNumber])
 }
+
+model UserProfile {
+  id               String   @id @default(cuid())
+  goal             String
+  experienceLevel  String
+  daysPerWeek      Int
+  equipment        String
+  sessionMinutes   Int
+  limitations      String?
+  painAreas        String[]
+  weightKg         Float?
+  heightCm         Float?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  workoutSessions  WorkoutSession[]
+}
+
+model WorkoutSession {
+  id          String         @id @default(cuid())
+  userProfileId String
+  dayName     String
+  sessionDate DateTime
+  source      String         // "generated"
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  userProfile UserProfile    @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+  entries     WorkoutEntry[]
+
+  @@index([userProfileId, sessionDate])
+}
+

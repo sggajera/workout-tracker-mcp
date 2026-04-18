@@ -1,3 +1,5 @@
+import { getBuiltWidgetHtml } from "./widget/serveWidget.js";
+import { prisma } from "@repo/db";
 import { createServer } from "node:http";
 import {
   registerAppResource,
@@ -17,255 +19,43 @@ type WorkoutRow = {
   done: boolean;
 };
 
-let workoutRows: WorkoutRow[] = [
-  {
-    id: "1",
-    exercise: "Incline Dumbbell Press",
-    set: 1,
-    reps: "12",
-    weight: "35 lb",
-    done: true,
-  },
-  {
-    id: "2",
-    exercise: "Incline Dumbbell Press",
-    set: 2,
-    reps: "10",
-    weight: "40 lb",
-    done: false,
-  },
-  {
-    id: "3",
-    exercise: "Shoulder Press",
-    set: 1,
-    reps: "12",
-    weight: "25 lb",
-    done: false,
-  },
-  {
-    id: "4",
-    exercise: "Lateral Raise",
-    set: 1,
-    reps: "15",
-    weight: "15 lb",
-    done: false,
-  },
-];
 
-function buildWorkoutHtml() {
-  return `
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Workout Tracker</title>
-    <style>
-      :root {
-        color: #0f172a;
-        font-family: Inter, system-ui, -apple-system, sans-serif;
-      }
+async function replyWithWorkout(message: string) {
+  const now = new Date();
 
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        padding: 16px;
-        background: #f8fafc;
-      }
+  const startOfDay = new Date(now);
+  startOfDay.setHours(0, 0, 0, 0);
 
-      .page {
-        max-width: 960px;
-        margin: 0 auto;
-        display: grid;
-        gap: 16px;
-      }
+  const endOfDay = new Date(now);
+  endOfDay.setHours(24, 0, 0, 0);
 
-      .card {
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 24px;
-        overflow: hidden;
-      }
-
-      .header {
-        padding: 24px;
-        display: flex;
-        justify-content: space-between;
-        gap: 16px;
-        align-items: flex-start;
-      }
-
-      .eyebrow {
-        font-size: 14px;
-        color: #64748b;
-        margin-bottom: 4px;
-      }
-
-      .title {
-        font-size: 44px;
-        font-weight: 700;
-        line-height: 1.1;
-        margin: 0;
-      }
-
-      .subtitle {
-        margin-top: 12px;
-        color: #475569;
-        font-size: 14px;
-      }
-
-      .progress {
-        background: #e2e8f0;
-        border-radius: 16px;
-        padding: 14px 18px;
-        min-width: 120px;
-        text-align: right;
-      }
-
-      .progress-label {
-        font-size: 12px;
-        color: #64748b;
-      }
-
-      .progress-value {
-        font-size: 18px;
-        font-weight: 700;
-        margin-top: 4px;
-      }
-
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-
-      thead {
-        background: #f8fafc;
-        color: #475569;
-      }
-
-      th, td {
-        padding: 14px 16px;
-        text-align: left;
-        border-top: 1px solid #e2e8f0;
-      }
-
-      thead th {
-        border-top: none;
-      }
-
-      .done-btn {
-        width: 28px;
-        height: 28px;
-        border-radius: 8px;
-        border: 1px solid #cbd5e1;
-        background: white;
-        cursor: pointer;
-        font-weight: 700;
-      }
-
-      .done-btn.is-done {
-        background: #0f172a;
-        border-color: #0f172a;
-        color: white;
-      }
-
-      .done-btn:disabled {
-        opacity: 0.7;
-        cursor: default;
-      }
-
-      .exercise {
-        font-weight: 600;
-      }
-
-      .notice {
-        border: 1px solid #f5d76e;
-        background: #fff7db;
-        color: #92400e;
-        border-radius: 24px;
-        padding: 14px 16px;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="root">Loading...</div>
-    <script>
-  function render(toolOutput) {
-    const rows = toolOutput?.rows ?? [];
-    const completed = rows.filter((row) => row.done).length;
-
-    const tableRows = rows.map((row) =>
-      '<tr style="border-top:1px solid #e2e8f0;">' +
-        '<td style="padding:14px;">' + (row.done ? '✓' : '') + '</td>' +
-        '<td style="padding:14px;font-weight:600;color:#0f172a;">' + row.exercise + '</td>' +
-        '<td style="padding:14px;color:#475569;">' + row.set + '</td>' +
-        '<td style="padding:14px;color:#475569;">' + row.reps + '</td>' +
-        '<td style="padding:14px;color:#475569;">' + row.weight + '</td>' +
-      '</tr>'
-    ).join('');
-
-    document.getElementById("root").innerHTML =
-      '<div style="font-family: Arial, sans-serif; padding: 16px; background:#f8fafc;">' +
-        '<div style="max-width: 960px; margin: 0 auto; display: grid; gap: 16px;">' +
-          '<div style="background:white;border:1px solid #e2e8f0;border-radius:20px;padding:20px;">' +
-            '<div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start;">' +
-              '<div>' +
-                '<div style="font-size:14px;color:#64748b;">Today\\'s Workout</div>' +
-                '<div style="font-size:40px;font-weight:700;color:#0f172a;">Push Day</div>' +
-                '<div style="font-size:14px;color:#475569;margin-top:8px;">Mock data from MCP server.</div>' +
-              '</div>' +
-              '<div style="background:#e2e8f0;border-radius:16px;padding:14px 18px;text-align:right;">' +
-                '<div style="font-size:12px;color:#64748b;">Progress</div>' +
-                '<div style="font-size:18px;font-weight:700;color:#0f172a;">' + completed + '/' + rows.length + ' sets</div>' +
-              '</div>' +
-            '</div>' +
-          '</div>' +
-          '<div style="background:white;border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;">' +
-            '<table style="width:100%;border-collapse:collapse;">' +
-              '<thead style="background:#f8fafc;color:#475569;">' +
-                '<tr>' +
-                  '<th style="text-align:left;padding:14px;">Done</th>' +
-                  '<th style="text-align:left;padding:14px;">Exercise</th>' +
-                  '<th style="text-align:left;padding:14px;">Set</th>' +
-                  '<th style="text-align:left;padding:14px;">Reps</th>' +
-                  '<th style="text-align:left;padding:14px;">Weight</th>' +
-                '</tr>' +
-              '</thead>' +
-              '<tbody>' + tableRows + '</tbody>' +
-            '</table>' +
-          '</div>' +
-        '</div>' +
-      '</div>';
-  }
-
-  function renderFromBridge() {
-    const toolOutput = window.openai?.toolOutput;
-    if (toolOutput) {
-      render(toolOutput);
-    }
-  }
-
-  renderFromBridge();
-
-  window.addEventListener("message", (event) => {
-    const message = event.data;
-    if (message?.method === "ui/notifications/tool-result") {
-      render(message.params?.structuredContent ?? message.params ?? {});
-    }
+  const dbRows = await prisma.workoutEntry.findMany({
+    where: {
+      date: {
+        gte: startOfDay,
+        lt: endOfDay,
+      },
+    },
+    orderBy: [
+      { exercise: "asc" },
+      { setNumber: "asc" },
+    ],
   });
-</script>
 
-  </body>
-</html>
-  `.trim();
-}
+  const rows = dbRows.map((row) => ({
+    id: row.id,
+    exercise: row.exercise,
+    set: row.setNumber,
+    reps: row.repsDone != null ? String(row.repsDone) : "",
+    weight: row.weight != null ? `${row.weight} lb` : "",
+    done: row.completed,
+  }));
 
-function replyWithWorkout(message: string) {
   return {
     content: [{ type: "text" as const, text: message }],
     structuredContent: {
       day: "Push Day",
-      rows: workoutRows,
+      rows,
     },
     _meta: {},
   };
@@ -280,14 +70,42 @@ function createWorkoutServer() {
   registerAppResource(
     server,
     "workout-widget",
-    "ui://widget/workout.html",
+    "ui://widget/workout-v6.html",
     {},
     async () => ({
       contents: [
         {
-          uri: "ui://widget/workout.html",
+          uri: "ui://widget/workout-v6.html",
           mimeType: RESOURCE_MIME_TYPE,
-          text: buildWorkoutHtml(),
+          text: `
+  <!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>Workout Tracker</title>
+      <link rel="stylesheet" href="https://workout-tracker-mcp.netlify.app/assets/index.css" />
+      <script type="module" src="https://workout-tracker-mcp.netlify.app/assets/index.js"></script>
+    </head>
+    <body>
+      <div id="root"></div>
+    </body>
+  </html>
+          `.trim(),
+          _meta: {
+            ui: {
+              domain: "https://workout-tracker-mcp.netlify.app",
+              csp: {
+                resourceDomains: ["https://workout-tracker-mcp.netlify.app"],
+                connectDomains: [],
+              },
+            },
+            "openai/widgetDomain": "https://workout-tracker-mcp.netlify.app",
+            "openai/widgetCSP": {
+              resource_domains: ["https://workout-tracker-mcp.netlify.app"],
+              connect_domains: [],
+            },
+          },
         },
       ],
     })
@@ -301,8 +119,8 @@ function createWorkoutServer() {
       description: "Returns today's workout plan.",
       inputSchema: {},
       _meta: {
-        ui: { resourceUri: "ui://widget/workout.html" },
-        "openai/outputTemplate": "ui://widget/workout.html",
+        ui: { resourceUri: "ui://widget/workout-v6.html" },
+        "openai/outputTemplate": "ui://widget/workout-v6.html",
       },
     },
     async () => replyWithWorkout("Here is today's workout.")
@@ -310,41 +128,112 @@ function createWorkoutServer() {
 
   registerAppTool(
     server,
-    "mark_set_done",
+    "toggle_set_done",
     {
-      title: "Mark set done",
-      description: "Marks a workout set as completed.",
+      title: "Toggle set done",
+      description: "Updates a workout set as completed.",
       inputSchema: {
         id: z.string(),
+        completed: z.boolean(),
       },
       _meta: {
-        ui: { resourceUri: "ui://widget/workout.html" },
-        "openai/outputTemplate": "ui://widget/workout.html",
+        ui: { resourceUri: "ui://widget/workout-v6.html" },
+        "openai/outputTemplate": "ui://widget/workout-v6.html",
       },
     },
     async (args) => {
       const id = args?.id;
-  
+      const completed = args?.completed;
       if (!id) {
         return replyWithWorkout("Missing workout row id.");
       }
-  
-      const existing = workoutRows.find((row) => row.id === id);
-  
+      console.log("toggle_set_done", args);
+    
+      const existing = await prisma.workoutEntry.findUnique({
+        where: { id },
+      });
+    
       if (!existing) {
         return replyWithWorkout(`Workout row ${id} was not found.`);
       }
-  
-      workoutRows = workoutRows.map((row) =>
-        row.id === id ? { ...row, done: true } : row
-      );
-  
+    
+      await prisma.workoutEntry.update({
+        where: { id },
+        data: { completed },
+      });
+    
       return replyWithWorkout(
-        `Marked ${existing.exercise} set ${existing.set} as done.`
+        `Marked ${existing.exercise} set ${existing.setNumber} as done.`
       );
     }
   );
 
+  registerAppTool(
+    server,
+    "save_onboarding_profile",
+    {
+      title: "Save onboarding profile",
+      description: "Save user's workout onboarding profile.",
+      inputSchema: {
+        goal: z.enum([
+          "build_muscle",
+          "get_stronger",
+          "lose_fat",
+          "general_fitness",
+        ]),
+        experienceLevel: z.enum([
+          "beginner",
+          "intermediate",
+          "advanced",
+        ]),
+        daysPerWeek: z.number().int().min(2).max(6),
+        equipment: z.enum([
+          "full_gym",
+          "dumbbells_only",
+          "home_gym",
+          "bodyweight_only",
+        ]),
+        sessionMinutes: z.number().int().min(30).max(75),
+        limitations: z.string().optional(),
+        painAreas: z.array(z.string()),
+        weightKg: z.number().positive().optional(),
+        heightCm: z.number().positive().optional(),
+      },
+      _meta: {
+        ui: { resourceUri: "ui://widget/workout-v6.html" },
+        "openai/outputTemplate": "ui://widget/workout-v6.html",
+      },
+    },
+    async (args) => {
+      const profile = await prisma.userProfile.create({
+        data: {
+          goal: args.goal,
+          experienceLevel: args.experienceLevel,
+          daysPerWeek: args.daysPerWeek,
+          equipment: args.equipment,
+          sessionMinutes: args.sessionMinutes,
+          limitations: args.limitations,
+          painAreas: args.painAreas,
+          weightKg: args.weightKg,
+          heightCm: args.heightCm,
+        },
+      });
+  
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: "Onboarding profile saved.",
+          },
+        ],
+        structuredContent: {
+          profileSaved: true,
+          userProfileId: profile.id,
+        },
+        _meta: {},
+      };
+    }
+  );
   return server;
 }
 
